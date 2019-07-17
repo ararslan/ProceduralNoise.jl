@@ -1,6 +1,6 @@
 __precompile__()
 
-module GradientNoise
+module ProceduralNoise
 
     include("perlin.jl")
     include("opensimplex.jl")
