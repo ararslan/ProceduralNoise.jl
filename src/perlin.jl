@@ -50,25 +50,31 @@ function interpolate(a0::T, a1::T, w::T, method::Symbol=:linear) where T <: Abst
 end
 
 
-function gradient(hash::Int, x::T, y::T, z::T) where T <: AbstractFloat
+function gradient3d(hash::Int64, x::T, y::T, z::T) where T <: AbstractFloat
     h = hash & 15
     u = h < 8 ? x : y
     v = h < 4 ? y : h == 12 || h == 14 ? x : z
     return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v)
 end
 
-function gradient(hash::Int, x::T...) where T <: AbstractFloat
+function gradient(hash::Int64, x::T...) where T <: AbstractFloat
     n = length(x)
-    h = hash % (n * (2 * n - 1)) + 1
-    h1 = h & 
+    nc2 = n * (2 * n + 1)
     xf = tuple(x..., .-x...)
+    table = Array{T,2}(undef, (nc2,2))
+    c = 1
+    for i in 1:2*n
+        for j in i:2*n
+	    table[c, :] .= [xf[i], xf[j]]
+	    c += 1
+	end
+    end
 
-    u = h < 8 ? x : y
-    v = h < 4 ? y : h == 12 || h == 14 ? x : z
-    return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v)
+    h = hash % (nc2) + 1
+    return table[h, 1] + table[h, 2]
 end
 
-function perlin(x::T, y::T, z::T) where T <: AbstractFloat
+function perlin3d(x::T, y::T, z::T) where T <: AbstractFloat
     xi = trunc(Int, x) & 255 + 1
     yi = trunc(Int, y) & 255 + 1
     zi = trunc(Int, z) & 255 + 1
@@ -102,40 +108,50 @@ function perlin(x::T, y::T, z::T) where T <: AbstractFloat
 end
 
 function perlin(x::T...) where T <: AbstractFloat
+    n = length(x)
+
     xi = trunc.(Int, x) .& 255 .+ 1
-
     xf = first.(modf.(x))
-
     u = fade.(xf)
 
-    for 
-    aaa = PERMS[PERMS[PERMS[xi] + yi] + zi]
-    aba = PERMS[PERMS[PERMS[xi] + yi + 1] + zi]
-    aab = PERMS[PERMS[PERMS[xi] + yi] + zi + 1]
-    abb = PERMS[PERMS[PERMS[xi] + yi + 1] + zi + 1]
-    baa = PERMS[PERMS[PERMS[xi + 1] + yi] + zi]
-    bba = PERMS[PERMS[PERMS[xi + 1] + yi + 1] + zi]
-    bab = PERMS[PERMS[PERMS[xi + 1] + yi] + zi + 1]
-    bbb = PERMS[PERMS[PERMS[xi + 1] + yi + 1] + zi + 1]
+    hypv = Iterators.product(repeat([[1,2]], n)...)
+    inds = zeros(Int64, size(hypv))
+    grads = Array{T, n}(undef, size(hypv))
+    for v in hypv
+        for (c, i) in zip(v, xi)
+	    inds[v...] = PERMS[inds[v...] + i + c - 1]
+	end
+        grads[v...] = gradient(inds[v...], (xf .- v .+ 1)...)
+    end
 
-    x1 = interpolate(gradient(aaa, xf, yf, zf), gradient(baa, xf - 1, yf, zf), u)
-    x2 = interpolate(gradient(aba, xf, yf - 1, zf), gradient(bba, xf - 1, yf - 1, zf), u)
-    y1 = interpolate(x1, x2, v)
+    for dm in n-1:-1:0
+        grads = interpolate.(grads[2, repeat([[1,2]],dm)...], grads[1, repeat([[1,2]],dm)...], u[n-dm])
+    end
 
-    x1 = interpolate(gradient(aab, xf, yf, zf - 1), gradient(bab, xf - 1, yf, zf - 1), u)
-    x2 = interpolate(gradient(abb, xf, yf - 1, zf - 1), gradient(bbb, xf - 1, yf - 1, zf - 1), u)
-    y2 = interpolate(x1, x2, v)
-
-    return (interpolate(y1, y2, w) + 1) / 2
+    return grads
 end
 
-function octaveperlin(x::T, y::T, z::T, octaves::Int, persistence::T) where T <: AbstractFloat
+function octaveperlin3d(octaves::Int, persistence::T, x::T, y::T, z::T) where T <: AbstractFloat
     total = 0.0
     frequency = 1.0
     amplitude = 1.0
     maxval = 0.0
     for i = 1:octaves
         total += perlin(x * frequency, y * frequency, z * frequency) * amplitude
+        maxval += amplitude
+        amplitude *= persistence
+        frequency *= 2
+    end
+    return total / maxval
+end
+
+function octaveperlin(octaves::Int, persistence::T, x::T...,) where T <: AbstractFloat
+    total = 0.0
+    frequency = 1.0
+    amplitude = 1.0
+    maxval = 0.0
+    for i = 1:octaves
+        total += perlin((x .* frequency)...) * amplitude
         maxval += amplitude
         amplitude *= persistence
         frequency *= 2
