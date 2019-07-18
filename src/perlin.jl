@@ -57,6 +57,16 @@ function gradient(hash::Int, x::T, y::T, z::T) where T <: AbstractFloat
     return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v)
 end
 
+function gradient(hash::Int, x::T...) where T <: AbstractFloat
+    n = length(x)
+    h = hash % (n * (2 * n - 1)) + 1
+    h1 = h & 
+    xf = tuple(x..., .-x...)
+
+    u = h < 8 ? x : y
+    v = h < 4 ? y : h == 12 || h == 14 ? x : z
+    return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v)
+end
 
 function perlin(x::T, y::T, z::T) where T <: AbstractFloat
     xi = trunc(Int, x) & 255 + 1
@@ -91,6 +101,33 @@ function perlin(x::T, y::T, z::T) where T <: AbstractFloat
     return (interpolate(y1, y2, w) + 1) / 2
 end
 
+function perlin(x::T...) where T <: AbstractFloat
+    xi = trunc.(Int, x) .& 255 .+ 1
+
+    xf = first.(modf.(x))
+
+    u = fade.(xf)
+
+    for 
+    aaa = PERMS[PERMS[PERMS[xi] + yi] + zi]
+    aba = PERMS[PERMS[PERMS[xi] + yi + 1] + zi]
+    aab = PERMS[PERMS[PERMS[xi] + yi] + zi + 1]
+    abb = PERMS[PERMS[PERMS[xi] + yi + 1] + zi + 1]
+    baa = PERMS[PERMS[PERMS[xi + 1] + yi] + zi]
+    bba = PERMS[PERMS[PERMS[xi + 1] + yi + 1] + zi]
+    bab = PERMS[PERMS[PERMS[xi + 1] + yi] + zi + 1]
+    bbb = PERMS[PERMS[PERMS[xi + 1] + yi + 1] + zi + 1]
+
+    x1 = interpolate(gradient(aaa, xf, yf, zf), gradient(baa, xf - 1, yf, zf), u)
+    x2 = interpolate(gradient(aba, xf, yf - 1, zf), gradient(bba, xf - 1, yf - 1, zf), u)
+    y1 = interpolate(x1, x2, v)
+
+    x1 = interpolate(gradient(aab, xf, yf, zf - 1), gradient(bab, xf - 1, yf, zf - 1), u)
+    x2 = interpolate(gradient(abb, xf, yf - 1, zf - 1), gradient(bbb, xf - 1, yf - 1, zf - 1), u)
+    y2 = interpolate(x1, x2, v)
+
+    return (interpolate(y1, y2, w) + 1) / 2
+end
 
 function octaveperlin(x::T, y::T, z::T, octaves::Int, persistence::T) where T <: AbstractFloat
     total = 0.0
