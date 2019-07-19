@@ -59,12 +59,12 @@ end
 
 function gradient(hash::Int64, x::T...) where T <: AbstractFloat
     n = length(x)
-    nc2 = n * (2 * n + 1)
+    nc2 = n * (2 * n + 1) - 2 * n
     xf = tuple(x..., .-x...)
     table = Array{T,2}(undef, (nc2,2))
     c = 1
     for i in 1:2*n
-        for j in i:2*n
+        for j in i+1:2*n
 	    table[c, :] .= [xf[i], xf[j]]
 	    c += 1
 	end
@@ -125,10 +125,52 @@ function perlin(x::T...) where T <: AbstractFloat
     end
 
     for dm in n-1:-1:0
-        grads = interpolate.(grads[2, repeat([[1,2]],dm)...], grads[1, repeat([[1,2]],dm)...], u[n-dm])
+        grads = interpolate.(grads[1, ntuple(i -> :, dm)...], grads[2, ntuple(i -> :, dm)...], u[n-dm])
     end
 
-    return grads
+    return (grads + 1) / 2
+end
+
+
+"""
+    perlin_fill(res, x)
+
+    Fills a hypercube (corners at (0...) and (x...)) with perlin noise.
+    res is a resolution (number of points per dimension)
+"""
+
+function perlin_fill(res::Int, x::T...) where T <: AbstractFloat
+    n = length(x)
+    
+    xs = Iterators.product(map(x -> range(0., stop=x, length=res), x))
+    idxs = Iterators.product(ntuple(i->1:res, n)...)
+    hypv = Iterators.product(repeat([[1,2]], n)...)
+    inds = Array{Int64, n}(undef, size(hypv))
+    grads = Array{T, n+n}(undef, (size(idxs)..., size(hypv)...))
+    us = Array{T, n+1}(undef, (size(idxs)..., n))
+
+    function local_perlin(idx::Int64...)
+        xl = idx ./ res .* x
+        xi = trunc.(Int, xl) .& 255 .+ 1
+        xf = first.(modf.(xl))
+        us[idx..., :] .= fade.(xf)
+
+        inds .= zeros(Int64, size(hypv))
+        for v in hypv
+            for (c, i) in zip(v, xi)
+                inds[v...] = PERMS[inds[v...] + i + c - 1]
+            end
+            grads[idx..., v...] = gradient(inds[v...], (xf .- v .+ 1)...)
+        end
+
+    end
+   
+    map(idx -> local_perlin(idx...), idxs)
+
+    for dm in n-1:-1:0
+        grads = interpolate.(grads[ntuple(i -> :, n)... ,1 , ntuple(i -> :, dm)...], grads[ntuple(i -> :, n)..., 2, ntuple(i -> :, dm)...], us[ntuple(i -> :, n)...,n-dm])
+    end
+    return (grads .+ 1) ./ 2
 end
 
 function octaveperlin3d(octaves::Int, persistence::T, x::T, y::T, z::T) where T <: AbstractFloat
