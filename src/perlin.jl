@@ -137,7 +137,7 @@ function octaveperlin3d(octaves::Int, persistence::T, x::T, y::T, z::T) where T 
     amplitude = 1.0
     maxval = 0.0
     for i = 1:octaves
-        total += perlin(x * frequency, y * frequency, z * frequency) * amplitude
+        total += perlin3d(x * frequency, y * frequency, z * frequency) * amplitude
         maxval += amplitude
         amplitude *= persistence
         frequency *= 2
