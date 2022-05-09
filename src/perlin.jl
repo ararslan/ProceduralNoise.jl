@@ -19,46 +19,20 @@ const PERMS1 = [151, 160, 137, 91, 90, 15, 131, 13, 201, 95, 96, 53, 194, 233, 7
 
 const PERMS = [PERMS1; PERMS1]
 
-
-function fade{T<:AbstractFloat}(x::T)
-    return 6x^5 - 15x^4 + 10x^3
-end
-
-
-function smoothstep{T<:AbstractFloat}(a0::T, a1::T, x::T)
-    a0 != a1 || throw(ArgumentError("Arguments a0 and a1 cannot be equal"))
-    x = clamp((x - a0) / (a1 - a0), 0.0, 1.0)
-    return 3x^2 - 2x^3
-end
-
-
-function smootherstep{T<:AbstractFloat}(a0::T, a1::T, x::T)
-    a0 != a1 || throw(ArgumentError("Arguments a0 and a1 cannot be equal"))
-    x = clamp((x - a0) / (a1 - a0), 0.0, 1.0)
-    return fade(x)
-end
-
-
-# Might refactor this down to a simple lerp
-function interpolate{T<:AbstractFloat}(a0::T, a1::T, w::T, method::Symbol=:linear)
-    0 ≤ w ≤ 1 || throw(ArgumentError("Expected 0 ≤ w ≤ 1, got $w"))
-    if method ∉ [:linear, :smoothstep, :smootherstep]
-        throw(ArgumentError("Unrecognized interpolation method $method"))
-    end
-    x = method == :linear ? w : eval(method)(a0, a1, w)
-    return a0 + x * (a1 - a0)
-end
-
-
-function gradient{T<:AbstractFloat}(hash::Int, x::T, y::T, z::T)
+function gradient(hash::Int, x::T, y::T, z::T) where {T<:AbstractFloat}
     h = hash & 15
     u = h < 8 ? x : y
-    v = h < 4 ? y : h == 12 || h == 14 ? x : z
+    v = if h < 4
+        y
+    elseif h == 12 || h == 14
+        x
+    else
+        z
+    end
     return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v)
 end
 
-
-function perlin{T<:AbstractFloat}(x::T, y::T, z::T)
+function perlin(x::T, y::T, z::T) where {T<:AbstractFloat}
     xi = trunc(Int, x) & 255 + 1
     yi = trunc(Int, y) & 255 + 1
     zi = trunc(Int, z) & 255 + 1
@@ -80,24 +54,25 @@ function perlin{T<:AbstractFloat}(x::T, y::T, z::T)
     bab = PERMS[PERMS[PERMS[xi + 1] + yi] + zi + 1]
     bbb = PERMS[PERMS[PERMS[xi + 1] + yi + 1] + zi + 1]
 
-    x1 = interpolate(gradient(aaa, xf, yf, zf), gradient(baa, xf - 1, yf, zf), u)
-    x2 = interpolate(gradient(aba, xf, yf - 1, zf), gradient(bba, xf - 1, yf - 1, zf), u)
-    y1 = interpolate(x1, x2, v)
+    x1 = lerp(gradient(aaa, xf, yf, zf), gradient(baa, xf - 1, yf, zf), u)
+    x2 = lerp(gradient(aba, xf, yf - 1, zf), gradient(bba, xf - 1, yf - 1, zf), u)
+    y1 = lerp(x1, x2, v)
 
-    x1 = interpolate(gradient(aab, xf, yf, zf - 1), gradient(bab, xf - 1, yf, zf - 1), u)
-    x2 = interpolate(gradient(abb, xf, yf - 1, zf - 1), gradient(bbb, xf - 1, yf - 1, zf - 1), u)
-    y2 = interpolate(x1, x2, v)
+    x1 = lerp(gradient(aab, xf, yf, zf - 1), gradient(bab, xf - 1, yf, zf - 1), u)
+    x2 = lerp(gradient(abb, xf, yf - 1, zf - 1), gradient(bbb, xf - 1, yf - 1, zf - 1), u)
+    y2 = lerp(x1, x2, v)
 
-    return (interpolate(y1, y2, w) + 1) / 2
+    return (lerp(y1, y2, w) + 1) / 2
 end
 
-
-function octaveperlin{T<:AbstractFloat}(x::T, y::T, z::T, octaves::Int, persistence::T)
+function octaveperlin(
+    x::T, y::T, z::T, octaves::Int, persistence::T
+) where {T<:AbstractFloat}
     total = 0.0
     frequency = 1.0
     amplitude = 1.0
     maxval = 0.0
-    for i = 1:octaves
+    for _ in 1:octaves
         total += perlin(x * frequency, y * frequency, z * frequency) * amplitude
         maxval += amplitude
         amplitude *= persistence

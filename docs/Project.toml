@@ -1,0 +1,3 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+ProceduralNoise = "49f857b6-67b3-4211-babc-c8b05fe28a5f"
