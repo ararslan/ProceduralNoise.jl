@@ -3,5 +3,11 @@
 *.jl.mem
 Manifest.toml
 /docs/build/
+
+# Benchmarking
+/.benchmarkci
+/benchmark/*.json
+
+# Dev environment
 .DS_Store
 .vscode
