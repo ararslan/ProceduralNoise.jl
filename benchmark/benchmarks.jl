@@ -8,5 +8,7 @@ x, y, z = rand(MersenneTwister(1234), Float32, 3)
 
 # Define benchmark
 SUITE = BenchmarkGroup()
-SUITE["perlin 3D"] = @benchmarkable perlin($x, $y, $z)
-SUITE["octaveperlin 3D"] = @benchmarkable octaveperlin($x, $y, $z, $3, $2.0f0)
+SUITE["Perlin"] = BenchmarkGroup(["noise", "perlin"])
+SUITE["Perlin"]["3D"] = BenchmarkGroup(["3d"])
+SUITE["Perlin"]["3D"]["perlin"] = @benchmarkable perlin($x, $y, $z)
+SUITE["Perlin"]["3D"]["octaveperlin"] = @benchmarkable octaveperlin($x, $y, $z, $3, $2.0f0)
